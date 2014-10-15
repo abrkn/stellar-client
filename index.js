@@ -8,7 +8,8 @@ var num = require('num')
 
 function StellarClient(opts) {
     this.opts = _.extend({
-        uri: 'wss://live.stellar.org:9001/'
+        uri: 'wss://live.stellar.org:9001/',
+        allTransactions: false
     }, opts)
 
     this.connected = false
@@ -72,7 +73,7 @@ StellarClient.prototype.connMessage = function(msg) {
         assert.equal(data.status, 'closed')
         assert.equal(data.validated, true)
 
-        if (data.engine_result == 'tesSUCCESS') {
+        if (this.allTransactions || data.engine_result == 'tesSUCCESS') {
             return this.emit('transaction', data.transaction)
         } else {
             return
