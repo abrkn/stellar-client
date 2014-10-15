@@ -146,7 +146,7 @@ function toTheirPayment(our) {
     assert(our.currency)
     assert(our.amount)
 
-    if (our.currency == 'XRP') {
+    if (our.currency == 'STR') {
         var n = num(our.amount).mul(1e6)
         n.set_precision(0)
         return n.toString()
