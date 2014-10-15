@@ -73,8 +73,8 @@ StellarClient.prototype.connMessage = function(msg) {
         assert.equal(data.status, 'closed')
         assert.equal(data.validated, true)
 
-        if (this.allTransactions || data.engine_result == 'tesSUCCESS') {
-            return this.emit('transaction', data.transaction)
+        if (this.opts.allTransactions || data.engine_result == 'tesSUCCESS') {
+            return this.emit('transaction', data)
         } else {
             return
         }
