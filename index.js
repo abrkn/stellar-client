@@ -191,4 +191,9 @@ StellarClient.prototype.payment = function(details, cb) {
     this.submit(tx, cb)
 }
 
+StellarClient.prototype.sign = function(tx, secret, cb) {
+    return StellarClient.sign(this, tx, secret, cb)
+}
+
+StellarClient.sign = require('./sign')
 module.exports = StellarClient

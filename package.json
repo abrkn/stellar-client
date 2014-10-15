@@ -24,6 +24,7 @@
     "debug": "^1.0.4",
     "lodash": "^2.4.1",
     "num": "git://github.com/abrkn/node-num.git#v0.2.10",
-    "recon-ws": "^1.0.0"
+    "recon-ws": "^1.0.0",
+    "stellar-lib": "^0.9.6"
   }
 }
