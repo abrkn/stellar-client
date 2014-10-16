@@ -105,12 +105,8 @@ exports.prototype.catchupAccount = function(account, from, cb) {
             if (err) return cb(err)
             assert(res.transactions)
             res.transactions.forEach(function(tx) {
-                if (tx.meta.TransactionResult != 'tesSUCCESS') {
-                    console.log('ignoring tx %s with transaction result %s',
-                        tx.tx.hash, tx.meta.TransactionResult)
-                    return
-                }
-                that.processTransaction(tx.tx)
+                if (tx.meta.TransactionResult != 'tesSUCCESS') return
+                that.processTransaction(tx)
             }.bind(that))
             if (!res.marker) return cb()
             next(res.marker)
@@ -153,21 +149,23 @@ exports.prototype.stellarTransaction = function(tx) {
 }
 
 exports.prototype.processTransaction = function(tx) {
-    if (tx.TransactionType != 'Payment') {
-        return debug('Ignoring tx type %s', tx.TransactionType)
+    var inner = tx.tx || tx.transaction
+
+    if (inner.TransactionType != 'Payment') {
+        return debug('Ignoring tx type %s', inner.TransactionType)
     }
 
     if (!this.live) {
         // Has the transaction already been processed by catch-up?
-        if (~this.processedHashes.indexOf(tx.hash)) return
+        if (~this.processedHashes.indexOf(inner.hash)) return
 
-        this.processedHashes.push(tx.hash)
+        this.processedHashes.push(inner.hash)
     }
 
     _.each(this.accounts, function(subs, account) {
-        if (account != tx.Destination) return
+        if (account != inner.Destination) return
         subs.forEach(function(sub) {
-            sub(tx)
+            sub(inner, tx.meta || inner.meta)
         })
     })
 }
