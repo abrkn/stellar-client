@@ -53,6 +53,11 @@ exports.prototype.stellarOpen = function() {
         }.bind(this)
     ], function(err) {
         if (err) {
+            if (err.message == 'Not synced to Stellar network.') {
+                debug('node is not synced to the network. retry in 5 sec')
+                return setTimeout(this.stellarOpen.bind(this), 5e3)
+            }
+
             var wrappedErr = new Error('Initialization failed: ' + err.message)
             wrappedErr.inner = err
             return this.emit('error', wrappedErr)
