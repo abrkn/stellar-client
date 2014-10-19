@@ -106,7 +106,7 @@ exports.prototype.catchupAccount = function(account, from, cb) {
             assert(res.transactions)
             res.transactions.forEach(function(tx) {
                 if (tx.meta.TransactionResult != 'tesSUCCESS') return
-                that.processTransaction(tx)
+                that.processTransaction(tx.tx, tx.meta)
             }.bind(that))
             if (!res.marker) return cb()
             next(res.marker)
@@ -145,12 +145,10 @@ exports.prototype.account = function(account, cb) {
 }
 
 exports.prototype.stellarTransaction = function(tx) {
-    this.processTransaction(tx)
+    this.processTransaction(tx.transaction, tx.meta)
 }
 
-exports.prototype.processTransaction = function(tx) {
-    var inner = tx.tx || tx.transaction
-
+exports.prototype.processTransaction = function(inner, meta) {
     if (inner.TransactionType != 'Payment') {
         return debug('Ignoring tx type %s', inner.TransactionType)
     }
@@ -165,7 +163,7 @@ exports.prototype.processTransaction = function(tx) {
     _.each(this.accounts, function(subs, account) {
         if (account != inner.Destination) return
         subs.forEach(function(sub) {
-            sub(inner, tx.meta || inner.meta)
+            sub(inner, meta)
         })
     })
 }
