@@ -60,7 +60,7 @@ module.exports = function(stellar, tx, cb) {
     function submit() {
         stellar.request('submit', tx, function(err, res) {
             if (err) {
-                finish(wrapError(inner, 'Failed to submit payment', 'SubmitFailed'))
+                finish(wrapError(err, 'Failed to submit payment', 'SubmitFailed'))
                 return
             }
 
