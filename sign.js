@@ -5,7 +5,7 @@ var DEFAULT_FEE = 10
 
 module.exports = function(stellar, txJson, secret, cb) {
     txJson = _.clone(txJson)
-    txJson.Fee = DEFAULT_FEE
+    txJson.Fee || (txJson.Fee = DEFAULT_FEE)
 
     // Determine the account sequence
     var req = { account: txJson.Account }
