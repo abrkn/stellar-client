@@ -1,5 +1,7 @@
 var assert = require('assert')
 var debug = require('debug')('stellar-client:tracked-submit')
+var util = require('util')
+var lodash = require('lodash')
 
 function wrapError(inner, msg, name) {
     var err = new Error(msg)
@@ -8,90 +10,83 @@ function wrapError(inner, msg, name) {
     return err
 }
 
-module.exports = function(stellar, tx, cb) {
-    // TODO: Wait for open?
-    function stellarOpen() {
-        debug('subscribing to transactions')
+var TrackedSubmit = function(opts) {
+    lodash.bindAll(this)
 
-        stellar.request('subscribe', { streams: ['transactions'] }, function(err) {
-            if (err) {
-                var wrappedErr = wrapError(err, 'Failed to subscribe', 'SubscribeFailed')
-                return finish(err)
-            }
+    this.client = opts.client
+    this.opts = opts || {}
 
-            debug('subscribed to transaction stream')
-
-            if (!submitted) {
-                submitted = true
-                submit()
-            }
-        })
-    }
-
-    function stellarClose() {
-        if (submitted) {
-            debug('stellar closed while waiting for tx')
-        }
-    }
-
-    function stellarTransaction(tx) {
-        if (!submitResult) return
-
-        var inner = tx.transaction
-        var meta = tx.meta
-
-        if (inner.hash != submitResult.tx_json.hash) return
-
-        assert.equal(tx.status, 'closed')
-        assert.equal(tx.validated, true)
-        assert.equal(tx.type, 'transaction')
-        assert.equal(inner.TransactionType, 'Payment')
-
-        if (meta.TransactionResult == 'tesSUCCESS') {
-            return finish(null, submitResult.tx_json.hash)
-        }
-
-        var err = new Error('TransactionResult is not tesSUCCESS')
-        err.name = 'TransactionFailed'
-        err.transactionResult = meta.TransactionResult
-        finish(err)
-    }
-
-    function submit() {
-        stellar.request('submit', tx, function(err, res) {
-            if (err) {
-                finish(wrapError(err, 'Failed to submit payment', 'SubmitFailed'))
-                return
-            }
-
-            submitResult = res
-
-            if (res.engine_result != 'tesSUCCESS') {
-                err = new Error(res.engine_result_message)
-                err.name = 'SubmitFailed'
-                err.engineResult = res.engine_result
-                finish(err)
-                return
-            }
-
-            debug('request submitted. hash %s', res.tx_json.hash)
-        })
-    }
-
-    function finish(err, res) {
-        debug('cleaning up')
-        stellar.removeListener('open', stellarOpen)
-        stellar.removeListener('close', stellarClose)
-        stellar.removeListener('transaction', stellarTransaction)
-        cb(err, res)
-    }
-
-    var submitResult, submitted
-
-    assert.equal(stellar.opts.allTransactions, true, 'allTransactions must be set on the Stellar client')
-
-    stellar.on('open', stellarOpen)
-    stellar.on('close', stellarClose)
-    stellar.on('transaction', stellarTransaction)
-    stellar.connected && stellarOpen()
+    assert(this.client, 'client must be set')
+    assert.equal(this.client.opts.allTransactions, true, 'allTransactions must be set on the client')
 }
+
+TrackedSubmit.prototype.forceWsClose = function() {
+    this.client.conn.ws.close()
+}
+
+TrackedSubmit.prototype.verify = function(hash, cb) {
+    debug('looking up tx...')
+
+    var retry = this.verify.bind(this, hash, cb)
+
+    this.client.request('tx', { transaction: hash }, function(err, tx) {
+        if (err) {
+            if (err.message.match(/^Not synced/)) {
+                debug('not synced error when looking up tx')
+                this.forceWsClose()
+                this.client.once('open', retry)
+                return
+            }
+
+            return cb(err)
+        }
+
+        debug('found tx')
+        debug('%j', tx)
+
+        assert.equal(tx.hash, hash)
+
+        if (tx.meta && tx.meta.TransactionResult == 'tesSUCCESS') {
+            assert(tx.inLedger)
+            debug('tx is a success and is included in ledger %s', tx.inLedger)
+            return cb(null, hash)
+        }
+
+        setTimeout(retry, 2.5e3)
+    }.bind(this))
+}
+
+TrackedSubmit.prototype.submitAndVerify = function(hex, cb) {
+    this.client.request('submit', { tx_blob: hex }, function(err, res) {
+        if (err) {
+            console.error('submit error', err.name, err)
+            err.sent = null
+            return cb(err)
+        }
+
+        if (res.engine_result == 'tesSUCCESS') {
+            this.verify(res.tx_json.hash, cb)
+            return
+        }
+
+        err = new Error(res.engine_result)
+        err.sent = false
+        return cb(err)
+    }.bind(this))
+}
+
+TrackedSubmit.prototype.send = function(hex, cb) {
+    if (!this.client.connected) {
+        debug('waiting for open...')
+        this.client.once('open', function() {
+            this.send(hex, cb)
+        }.bind(this))
+        return
+    }
+
+    debug('submitting')
+
+    this.submitAndVerify(hex, cb)
+}
+
+module.exports = TrackedSubmit

@@ -200,6 +200,11 @@ StellarClient.prototype.submitAndTrack = function(tx, cb) {
 }
 
 StellarClient.sign = require('./sign')
-StellarClient.submitAndTrack = require('./tracked-submit')
+
+StellarClient.submitAndTrack = function(client, hex, cb) {
+    var TrackedSubmit = require('./tracked-submit')
+    var tracked = new TrackedSubmit({ client: client })
+    tracked.send(hex, cb)
+}
 
 module.exports = StellarClient
