@@ -21,7 +21,12 @@ module.exports = function(stellar, txJson, secret, cb) {
         tx.tx_json = txJson
         tx._secret = secret
         tx.complete()
-        tx.sign()
+
+        try {
+            tx.sign()
+        } catch (e) {
+            cb(e)
+        }
 
         var hex = tx.serialize().to_hex()
 
