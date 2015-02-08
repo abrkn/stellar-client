@@ -18,9 +18,14 @@ function StellarClient(opts) {
     this.conn.on('open', this.connOpen.bind(this))
     this.conn.on('close', this.connClose.bind(this))
     this.conn.on('message', this.connMessage.bind(this))
+    this.conn.on('error', this.connError.bind(this))
 }
 
 util.inherits(StellarClient, EventEmitter)
+
+StellarClient.prototype.connError = function(err) {
+    this.emit('error', err)
+}
 
 StellarClient.prototype.connOpen = function() {
     debug('connected')
@@ -82,6 +87,10 @@ StellarClient.prototype.connMessage = function(msg) {
 
     if (data.type == 'ledgerClosed') {
         return this.emit('ledgerclosed', data)
+    }
+
+    if (data.type == 'serverStatus') {
+        return this.emit('server', data)
     }
 
     console.error('unhandled transaction type %s', data.type)
